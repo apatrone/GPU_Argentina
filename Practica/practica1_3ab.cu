@@ -61,7 +61,7 @@ int main(int argc, char *argv[]){
 		h_array1[i]=rand()%10;
 		h_array2[i]=rand()%10;
 		printf("%i|%i\t",  h_array1[i], h_array2[i]);
-		if(i%(int)sqrt(size_array)==2)
+		if((i+1)%(int)sqrt(size_array)==0)
 			printf("\n");
 	}
 	printf("\n");
@@ -85,7 +85,7 @@ int main(int argc, char *argv[]){
 
     for(int i=0; i<size_array; i++){
         printf("%i\t", h_array3[i]);
-	if(i%(int)(sqrt(size_array))==2)
+	if((i+1)%(int)(sqrt(size_array))==0)
 		printf("\n");
 	}
 	printf("\n");	
@@ -93,6 +93,6 @@ int main(int argc, char *argv[]){
       free(h_array3); free(h_array2); free(h_array1);
       cudaFree(d_array3);cudaFree(d_array2);cudaFree(d_array1);
 
-	  printf("Time elapsed: %f seconds\n", (((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.215s
+	  printf("Time elapsed: %f seconds\n", (((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.18s
 
 }
