@@ -1,16 +1,14 @@
-/*Realizar un programa CUDA que dado un vector V de N números enteros multiplique a 
-cada número por una constante C, se deben realizar dos implementaciones:
-a.Tanto C como N deben ser pasados como parámetros al kernel.
-b.Tanto C como N deben estar almacenados en la memoria de constantes de la GPU*/
+
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <math.h>
 //M and N number of threads (grid and block)
 #define M 1 
-#define N 1   
+#define N 10   
 
 
 
@@ -25,7 +23,7 @@ __global__ void multiply( const int a[] ,const int b[], int c[] , const int dim,
 			c[index]=a[index]+b[index]; 
 			
 		}
-		else{ //if less threads than array size
+	else{ //if less threads than array size
 			if(index!=thread_number-1){//if not last thread deal with size_array/thread_nb array entries
 				for(int i=index*(int)(dim/thread_number); i< index*(int)(dim/thread_number)+(int)(dim/thread_number); i++){
 					printf("Thread %i; Modifying value of index %i \n", index, i);
@@ -49,27 +47,25 @@ int main(int argc, char *argv[]){
 	clock_t time_begin;
 	time_begin=clock();
     // pointers to host & device arrays
-      int **d_array1 = 0,**d_array2 = 0,**d_array3 = 0;
-      int **h_array1 = 0,**h_array2 = 0,**h_array3 = 0;
-	  int size_array=10; //here, size_array =L where each matrix = L * L
+      int *d_array1 = 0,*d_array2 = 0,*d_array3 = 0;
+      int *h_array1 = 0,*h_array2 = 0,*h_array3 = 0;
+	  int size_array=9; //here, size_array =L hqs to be a square
       // malloc columns of host arrays
-      h_array1 = (int*)malloc( size_array * sizeof(int*));
-	  h_array2 = (int*)malloc( size_array * sizeof(int*));
-	  h_array3 = (int*)malloc( size_array * sizeof(int*));
-	  //malloc rows of host arrays
-	  for(int i=0; i<size_array; i++){
-		  h_array1[i]=(int*)malloc( size_array * sizeof(int));
-		  h_array2[i]=(int*)malloc( size_array * sizeof(int));
-		  h_array3[i]=(int*)malloc( size_array * sizeof(int));
-	  }
-    for(int i=0; i<size_array; i++){
-		for(int j=0; j<size_array; j++){
-			h_array1[i][j]=rand()%10;
-			h_array2[i][j]=rand()%10;
-			printf("%i|%i\t",  h_array1[i][j], h_array2[i][j]);
-		}
-		printf("\n");
-    }
+      h_array1 = (int*)malloc( size_array * sizeof(int));
+	h_array2 = (int*)malloc( size_array * sizeof(int));
+	h_array3 = (int*)malloc( size_array * sizeof(int));
+	  
+		  
+ 
+	for(int i=0; i<size_array; i++){
+		h_array1[i]=rand()%10;
+		h_array2[i]=rand()%10;
+		printf("%i|%i\t",  h_array1[i], h_array2[i]);
+		if(i%(int)sqrt(size_array)==2)
+			printf("\n");
+	}
+	printf("\n");
+ 
 
      // cudaMalloc a device array
     cudaMalloc(&d_array1,size_array * sizeof(int));    
@@ -87,10 +83,12 @@ int main(int argc, char *argv[]){
     // download and inspect the result on the host:
     cudaMemcpy(h_array3, d_array3, sizeof(int)*size_array, cudaMemcpyDeviceToHost); 
 
-    for(int i=0; i<size_array; i++)
+    for(int i=0; i<size_array; i++){
         printf("%i\t", h_array3[i]);
-
-	
+	if(i%(int)(sqrt(size_array))==2)
+		printf("\n");
+	}
+	printf("\n");	
      // deallocate memory
       free(h_array3); free(h_array2); free(h_array1);
       cudaFree(d_array3);cudaFree(d_array2);cudaFree(d_array1);
