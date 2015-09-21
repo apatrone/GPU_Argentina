@@ -71,7 +71,7 @@ int main(int argc, char *argv[]){
 	for(int i=0; i<size_array; i++){
 		h_array1[i]=rand()%10;
 		printf("%i\t",  h_array1[i]);
-		if((i+1)%(int)(sqrt(size_array))==0)
+		if((i+1)%(int)(sqrt((float)size_array))==0)
 			printf("\n");
 	}
 	printf("\n");
@@ -88,14 +88,14 @@ int main(int argc, char *argv[]){
     dim3 bloque(N,N); //Bloque bidimensional de N*N hilos
     dim3 grid(M,M);  //Grid bidimensional de M*M bloques
 	int thread_number= N*N*M*M;
-    multiply<<<grid, bloque>>>(d_array1, d_array2 , sqrt(size_array), thread_number);
+    multiply<<<grid, bloque>>>(d_array1, d_array2 , sqrt((float)size_array), thread_number);
     cudaThreadSynchronize();
     // download and inspect the result on the host:
     cudaMemcpy(h_array2, d_array2, sizeof(int)*size_array, cudaMemcpyDeviceToHost); 
 
     for(int i=0; i<size_array; i++){
         printf("%i\t", h_array2[i]);
-	if((i+1)%(int)(sqrt(size_array))==0)
+	if((i+1)%(int)(sqrt((float)size_array))==0)
 		printf("\n");
 	}
 	printf("\n");	
