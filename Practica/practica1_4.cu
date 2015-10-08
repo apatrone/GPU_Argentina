@@ -33,7 +33,7 @@ __global__ void multiply( const int a[] , int c[] , const int sqrt_dim,const int
 			c[index_j+index_i * sqrt_dim]=a[index]; 
 			
 		}
-	else{ //if less threads than array size
+		else{ //if less threads than array size
 			printf("index %i in matrix form would be i=%i and j=%i\n", index, index_i, index_j);
 			if(index!=thread_number-1){//if not last thread deal with size_array/thread_nb array entries
 				for(int i=index*(int)(dim/thread_number); i< index*(int)(dim/thread_number)+(int)(dim/thread_number); i++){
