@@ -9,7 +9,7 @@
 //M and N number of threads (grid and block)
 #define M 1 
 #define N 1
-
+void secuential(const int a[] ,const int b[], const int sqrt_dim);
      
 __global__ void multiply( const int a[] ,const int b[], int c[] , const int sqrt_dim,const int thread_number)
 {
@@ -67,7 +67,6 @@ __global__ void multiply( const int a[] ,const int b[], int c[] , const int sqrt
 int main(int argc, char *argv[]){
 	//Measure time
 	clock_t time_begin;
-	time_begin=clock();
     // pointers to host & device arrays
       int *d_array1 = 0,*d_array2 = 0,*d_array3 = 0;
       int *h_array1 = 0,*h_array2 = 0,*h_array3 = 0;
@@ -108,11 +107,13 @@ int main(int argc, char *argv[]){
     dim3 bloque(N,N); //Bloque bidimensional de N*N hilos (max 512 threads in a block)
     dim3 grid(M,M);  //Grid bidimensional de M*M bloques
 	int thread_number= N*N*M*M;
-	printf("Number of threads: %i\n", thread_number);
+	time_begin=clock();
     multiply<<<grid, bloque>>>(d_array1, d_array2 , d_array3,sqrt((float)size_array), thread_number);
     cudaThreadSynchronize();
     // download and inspect the result on the host:
     cudaMemcpy(h_array3, d_array3, sizeof(int)*size_array, cudaMemcpyDeviceToHost); 
+	
+	printf("GPU time, %i threads: %f seconds\n", thread_number,(((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.18s
 
 	printf("Array C=B + AB^t + A^t :\n");
     for(int i=0; i<size_array; i++){
@@ -120,12 +121,38 @@ int main(int argc, char *argv[]){
 	if((i+1)%(int)(sqrt((float)size_array))==0)
 		printf("\n");
 	}
-	printf("\n");	
+	printf("\n");
+	time_begin=clock();
+	secuential(h_array1, h_array2, sqrt((float)size_array));
+	printf("CPU time: %f seconds\n", (((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.18s
      // deallocate memory
-      free(h_array3); free(h_array2); free(h_array1);
-      cudaFree(d_array3);cudaFree(d_array2);cudaFree(d_array1);
+    free(h_array3); free(h_array2); free(h_array1);
+    cudaFree(d_array3);cudaFree(d_array2);cudaFree(d_array1);
 
-	  printf("Time elapsed: %f seconds\n", (((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.18s
+	  
 
 }
 
+void secuential(const int a[] ,const int b[], const int sqrt_dim){
+	int dim = sqrt_dim* sqrt_dim;
+	int index_i, index_j;
+	int *c= (int *)malloc ( sqrt_dim * sizeof(int));
+	for(int i=0; i< dim; i++){
+		index_i = (int)i%sqrt_dim; 
+		index_j = (i-index_i)/sqrt_dim;
+		c[i]= b[i]; //c= b
+		c[i]+= a[index_j+ index_i * sqrt_dim]; //c+= a^t
+		for(int j=0;j<sqrt_dim;j++){ //row of first matrix
+			c[i]+=a[j+index_j * sqrt_dim ]*b[j + index_i*sqrt_dim]; //c+= a*b^t
+		}
+	}
+
+	printf("Sequential result: Array C=B + AB^t + A^t :\n");
+    for(int i=0; i<dim; i++){
+        printf("%i\t", c[i]);
+		if((i+1)%(int)(sqrt((float)dim))==0)
+			printf("\n");
+	}
+	printf("\n");
+	
+}
