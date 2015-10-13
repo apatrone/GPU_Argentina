@@ -10,8 +10,7 @@ b.Tanto C como N deben estar almacenados en la memoria de constantes de la GPU*/
 #include <time.h>
 #include <math.h>
 //M and N number of threads (grid and block)
-#define M 1 
-#define N 10
+
 
 
 
@@ -22,19 +21,19 @@ __global__ void addAll( const int array[] , int dim,float result[], const int th
  	//printf("sum:%i\n",  result[0]);
 	if(index<dim){
 		if(dim<=thread_number){ //if more threads than array size
-			printf("Thread %i; Adding value of index %i\n", index, index, array[index]);
+		//	printf("Thread %i; Adding value of index %i\n", index, index, array[index]);
 			atomicAdd(result,array[index]);
 		}
 		else{ //if less threads than array size
 			if(index!=thread_number-1){//if not last thread deal with size_array/thread_nb array entries
 				for(int i=index*(int)(dim/thread_number); i< index*(int)(dim/thread_number)+(int)(dim/thread_number); i++){
-					printf("Thread %i; Adding value of index %i\n", index, i, array[i]);
+			//		printf("Thread %i; Adding value of index %i\n", index, i, array[i]);
 					atomicAdd(result,array[i]);
 				}
 			}
 			else{ //if last thread deal with all remaining array entries
 				for(int i=index*(int)(dim/thread_number); i< dim; i++){
-					printf("Thread %i; Adding value of index %i\n",index, i, array[i]);
+				//	printf("Thread %i; Adding value of index %i\n",index, i, array[i]);
 					atomicAdd(result,array[i]);
 				}
 			}
@@ -49,19 +48,19 @@ __global__ void sigma( const int array[] , int dim,float result[], const float m
  	//printf("sum:%i\n",  result[0]);
 	if(index<dim){
 		if(dim<=thread_number){ //if more threads than array size
-			printf("Thread %i; Adding value of index %i\n", index, index, array[index]);
+			//printf("Thread %i; Adding value of index %i\n", index, index, array[index]);
 			atomicAdd(result,(array[index]-mean)*(array[index]-mean));
 		}
 		else{ //if less threads than array size
 			if(index!=thread_number-1){//if not last thread deal with size_array/thread_nb array entries
 				for(int i=index*(int)(dim/thread_number); i< index*(int)(dim/thread_number)+(int)(dim/thread_number); i++){
-					printf("Thread %i; Adding value of index %i\n", index, i, array[i]);
+					//printf("Thread %i; Adding value of index %i\n", index, i, array[i]);
 					atomicAdd(result,(array[i]-mean)*(array[i]-mean));
 				}
 			}
 			else{ //if last thread deal with all remaining array entries
 				for(int i=index*(int)(dim/thread_number); i< dim; i++){
-					printf("Thread %i; Adding value of index %i\n",index, i, array[i]);
+					//printf("Thread %i; Adding value of index %i\n",index, i, array[i]);
 					atomicAdd(result,(array[i]-mean)*(array[i]-mean));
 				}
 			}
@@ -71,6 +70,7 @@ __global__ void sigma( const int array[] , int dim,float result[], const float m
 
 
 }
+
 
     
 int main(int argc, char *argv[]){
@@ -85,6 +85,12 @@ int main(int argc, char *argv[]){
 	 float *h_sum= 0;
 	 float mean;
 	 float final_res;
+	 int M=1, N=1;
+	 if(argc == 4){
+		 size_array=atoi(argv[1]);
+		 N=atoi(argv[2]);
+		 M=atoi(argv[3]);
+	 }
 	 h_sum=( float*)malloc(sizeof( float));
 	 h_sum[0]=0;
       // malloc a host array
@@ -92,7 +98,7 @@ int main(int argc, char *argv[]){
 	
     for(int i=0; i<size_array; i++){
         host_array[i]=rand()%10;
-        printf("%i\t", host_array[i]);
+       // printf("%i\t", host_array[i]);
     }
     printf("\n");
 	

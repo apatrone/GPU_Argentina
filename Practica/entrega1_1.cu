@@ -7,8 +7,7 @@
 #include <time.h>
 #include <math.h>
 //M and N number of threads (grid and block)
-#define M 1 
-#define N 1
+
 void secuential(const int a[] ,const int b[], const int sqrt_dim);
      
 __global__ void multiply( const int a[] ,const int b[], int c[] , const int sqrt_dim,const int thread_number)
@@ -24,7 +23,7 @@ __global__ void multiply( const int a[] ,const int b[], int c[] , const int sqrt
 	if(index<dim){
 		c[index]=0;
 		if(dim<=thread_number){ //if more threads than array size
-			printf("Thread %i; Modifying value of index %i\n ", index, index);
+			//printf("Thread %i; Modifying value of index %i\n ", index, index);
 			c[index]= b[index]; //c= b
 			c[index]+= a[index_j+ index_i * sqrt_dim]; //c+= a^t
 			for(int i=0; i<sqrt_dim;i++){ //row of first matrix	
@@ -36,7 +35,7 @@ __global__ void multiply( const int a[] ,const int b[], int c[] , const int sqrt
 				
 				if(index!=thread_number-1){//if not last thread deal with size_array/thread_nb array entries
 					for(int i=index*(int)(dim/thread_number); i< index*(int)(dim/thread_number)+(int)(dim/thread_number); i++){
-						printf("Thread %i; Modifying value of index %i \n", index, i);
+					//	printf("Thread %i; Modifying value of index %i \n", index, i);
 						index_i =  (int)i%sqrt_dim; 
 						index_j = (i-index_i)/sqrt_dim;
 						c[i]= b[i]; //c= b
@@ -48,7 +47,7 @@ __global__ void multiply( const int a[] ,const int b[], int c[] , const int sqrt
 				}
 				else{ //if last thread deal with all remaining array entries
 					for(int i=index*(int)(dim/thread_number); i< dim; i++){
-						printf("Thread %i; Modifying value of index %i\n",index, i );
+			//			printf("Thread %i; Modifying value of index %i\n",index, i );
 						index_i = (int)i%sqrt_dim; 
 						index_j = (i-index_i)/sqrt_dim;
 						c[i]= b[i]; //c= b
@@ -71,12 +70,19 @@ int main(int argc, char *argv[]){
       int *d_array1 = 0,*d_array2 = 0,*d_array3 = 0;
       int *h_array1 = 0,*h_array2 = 0,*h_array3 = 0;
 	  int size_array=9; //here, size_array =L hqs to be a square
+
+	 int M=1, N=1;
+	 if(argc == 4){
+		 size_array=atoi(argv[1]);
+		 N=atoi(argv[2]);
+		 M=atoi(argv[3]);
+	 }  
       // malloc columns of host arrays
       h_array1 = (int*)malloc( size_array * sizeof(int));
 	  h_array2 = (int*)malloc( size_array * sizeof(int));
 	  h_array3 = (int*)malloc( size_array * sizeof(int));
-	  
-		  
+	
+	/*	  
 	printf("Array A:\n");
 	for(int i=0; i<size_array; i++){
 		h_array1[i]=rand()%10;
@@ -93,7 +99,7 @@ int main(int argc, char *argv[]){
 		if((i+1)%(int)sqrt((float)size_array)==0)
 			printf("\n");
 	}
-	printf("\n");
+	printf("\n");*/
  
 
      // cudaMalloc a device array
@@ -115,13 +121,13 @@ int main(int argc, char *argv[]){
 	
 	printf("GPU time, %i threads: %f seconds\n", thread_number,(((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.18s
 
-	printf("Array C=B + AB^t + A^t :\n");
+/*	printf("Array C=B + AB^t + A^t :\n");
     for(int i=0; i<size_array; i++){
         printf("%i\t", h_array3[i]);
 	if((i+1)%(int)(sqrt((float)size_array))==0)
 		printf("\n");
 	}
-	printf("\n");
+	printf("\n");*/
 	time_begin=clock();
 	secuential(h_array1, h_array2, sqrt((float)size_array));
 	printf("CPU time: %f seconds\n", (((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.18s
@@ -136,7 +142,7 @@ int main(int argc, char *argv[]){
 void secuential(const int a[] ,const int b[], const int sqrt_dim){
 	int dim = sqrt_dim* sqrt_dim;
 	int index_i, index_j;
-	int *c= (int *)malloc ( sqrt_dim * sizeof(int));
+	int *c= (int *)malloc ( dim * sizeof(int));
 	for(int i=0; i< dim; i++){
 		index_i = (int)i%sqrt_dim; 
 		index_j = (i-index_i)/sqrt_dim;
@@ -147,12 +153,12 @@ void secuential(const int a[] ,const int b[], const int sqrt_dim){
 		}
 	}
 
-	printf("Sequential result: Array C=B + AB^t + A^t :\n");
+	/*printf("Sequential result: Array C=B + AB^t + A^t :\n");
     for(int i=0; i<dim; i++){
         printf("%i\t", c[i]);
 		if((i+1)%(int)(sqrt((float)dim))==0)
 			printf("\n");
 	}
-	printf("\n");
-	
+	printf("\n");*/
+	free(c);
 }
