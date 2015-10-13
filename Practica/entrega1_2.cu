@@ -8,9 +8,10 @@ b.Tanto C como N deben estar almacenados en la memoria de constantes de la GPU*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <math.h>
 //M and N number of threads (grid and block)
 #define M 1 
-#define N 1
+#define N 10
 
 
 
@@ -83,6 +84,7 @@ int main(int argc, char *argv[]){
 	 float *d_sum=NULL;
 	 float *h_sum= 0;
 	 float mean;
+	 float final_res;
 	 h_sum=( float*)malloc(sizeof( float));
 	 h_sum[0]=0;
       // malloc a host array
@@ -123,8 +125,9 @@ int main(int argc, char *argv[]){
 
 	 printf("Sigma: %f\n", h_sum[0]);
 	
-  
+	final_res = sqrt(h_sum[0]/(size_array-1));
 	
+	printf("Final result: %f\n", final_res);
      // deallocate memory
       free(host_array);free(h_sum);
       cudaFree(device_array); cudaFree(d_sum);
