@@ -1,4 +1,3 @@
-
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
@@ -6,9 +5,21 @@
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
+
+#include <sys/time.h>
+#include <sys/resource.h>
+double dwalltime(){
+        double sec;
+        struct timeval tv;
+
+        gettimeofday(&tv,NULL);
+        sec = tv.tv_sec + tv.tv_usec/1000000.0;
+        return sec;
+}
+
 //M and N number of threads (grid and block)
 
-void secuential(const int a[] ,const int b[], const int sqrt_dim);
+void secuential(const int a[] ,const int b[], int c[], const int sqrt_dim);
      
 __global__ void multiply( const int a[] ,const int b[], int c[] , const int sqrt_dim,const int thread_number)
 {
@@ -69,37 +80,39 @@ int main(int argc, char *argv[]){
     // pointers to host & device arrays
       int *d_array1 = 0,*d_array2 = 0,*d_array3 = 0;
       int *h_array1 = 0,*h_array2 = 0,*h_array3 = 0;
-	  int size_array=9; //here, size_array =L hqs to be a square
+	  int *h_array_sec= 0;
+	  int size_array=9; //here, size_array =L has to be a square
 
 	 int M=1, N=1;
 	 if(argc == 4){
-		 size_array=atoi(argv[1]);
+		 size_array=atoi(argv[1]) * atoi(argv[1]) ;
 		 N=atoi(argv[2]);
 		 M=atoi(argv[3]);
 	 }  
       // malloc columns of host arrays
-      h_array1 = (int*)malloc( size_array * sizeof(int));
+     	h_array1 = (int*)malloc( size_array * sizeof(int));
+	  h_array_sec= (int*)malloc( size_array * sizeof(int));
 	  h_array2 = (int*)malloc( size_array * sizeof(int));
 	  h_array3 = (int*)malloc( size_array * sizeof(int));
 	
-	/*	  
-	printf("Array A:\n");
+	  
+	//printf("Array A:\n");
 	for(int i=0; i<size_array; i++){
-		h_array1[i]=rand()%10;
-		printf("%i\t",  h_array1[i]);
-		if((i+1)%(int)sqrt((float)size_array)==0)
-			printf("\n");
+		h_array1[i]=1;//rand()%10;
+	//	printf("%i\t",  h_array1[i]);
+		//if((i+1)%(int)sqrt((float)size_array)==0)
+		//	printf("\n");
 	}
-	printf("\n");
+	//printf("\n");
  
-	printf("Array B:\n");
+	//printf("Array B:\n");
 	for(int i=0; i<size_array; i++){
-		h_array2[i]=rand()%10;
-		printf("%i\t",  h_array2[i]);
-		if((i+1)%(int)sqrt((float)size_array)==0)
-			printf("\n");
+		h_array2[i]=1;//rand()%10; 	
+		//printf("%i\t",  h_array2[i]);
+		//if((i+1)%(int)sqrt((float)size_array)==0)
+		//	printf("\n");
 	}
-	printf("\n");*/
+	//printf("\n");
  
 
      // cudaMalloc a device array
@@ -113,36 +126,50 @@ int main(int argc, char *argv[]){
     dim3 bloque(N,N); //Bloque bidimensional de N*N hilos (max 512 threads in a block)
     dim3 grid(M,M);  //Grid bidimensional de M*M bloques
 	int thread_number= N*N*M*M;
-	time_begin=clock();
+	printf("%i threads, %ix%i matrix\n", thread_number,  (int)sqrt((float)size_array), (int)sqrt((float)size_array));
+	time_begin=dwalltime();
     multiply<<<grid, bloque>>>(d_array1, d_array2 , d_array3,sqrt((float)size_array), thread_number);
     cudaThreadSynchronize();
     // download and inspect the result on the host:
     cudaMemcpy(h_array3, d_array3, sizeof(int)*size_array, cudaMemcpyDeviceToHost); 
 	
-	printf("GPU time, %i threads: %f seconds\n", thread_number,(((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.18s
+	printf("GPU time: %f seconds\n", dwalltime() - time_begin);
+	//windows time
+	//printf("GPU time, %i threads: %f seconds\n", thread_number,(((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.18s
 
-/*	printf("Array C=B + AB^t + A^t :\n");
+
+
+	printf("Array C=B + AB^t + A^t :\n");
     for(int i=0; i<size_array; i++){
         printf("%i\t", h_array3[i]);
 	if((i+1)%(int)(sqrt((float)size_array))==0)
 		printf("\n");
 	}
-	printf("\n");*/
-	time_begin=clock();
-	secuential(h_array1, h_array2, sqrt((float)size_array));
-	printf("CPU time: %f seconds\n", (((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.18s
+	printf("\n");
+	time_begin=dwalltime();
+	secuential(h_array1, h_array2,  h_array_sec, sqrt((float)size_array));
+
+	printf("CPU time: %f seconds\n", dwalltime() - time_begin);
+	//windows time
+	//printf("CPU time: %f seconds\n", (((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.18s
      // deallocate memory
-    free(h_array3); free(h_array2); free(h_array1);
+	for(int i=0; i<size_array; i++){
+		if(h_array_sec[i] !=  h_array3[i]){
+			printf("GPU and CPU have different results at position %i\n", i);
+			break;		
+		}
+	}
+    free(h_array3); free(h_array2); free(h_array1); free(h_array_sec);
     cudaFree(d_array3);cudaFree(d_array2);cudaFree(d_array1);
 
 	  
 
 }
 
-void secuential(const int a[] ,const int b[], const int sqrt_dim){
+void secuential(const int a[] ,const int b[], int c[], const int sqrt_dim){
 	int dim = sqrt_dim* sqrt_dim;
 	int index_i, index_j;
-	int *c= (int *)malloc ( dim * sizeof(int));
+	//int *c= (int *)malloc ( dim * sizeof(int));
 	for(int i=0; i< dim; i++){
 		index_i = (int)i%sqrt_dim; 
 		index_j = (i-index_i)/sqrt_dim;
@@ -160,5 +187,5 @@ void secuential(const int a[] ,const int b[], const int sqrt_dim){
 			printf("\n");
 	}
 	printf("\n");*/
-	free(c);
+	//free(c);
 }
