@@ -1,7 +1,4 @@
-/*Realizar un programa CUDA que dado un vector V de N números enteros multiplique a 
-cada número por una constante C, se deben realizar dos implementaciones:
-a.Tanto C como N deben ser pasados como parámetros al kernel.
-b.Tanto C como N deben estar almacenados en la memoria de constantes de la GPU*/
+
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
@@ -9,8 +6,18 @@ b.Tanto C como N deben estar almacenados en la memoria de constantes de la GPU*/
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
-//M and N number of threads (grid and block)
 
+
+#include <sys/time.h>
+#include <sys/resource.h>
+double dwalltime(){
+        double sec;
+        struct timeval tv;
+
+        gettimeofday(&tv,NULL);
+        sec = tv.tv_sec + tv.tv_usec/1000000.0;
+        return sec;
+}
 
 float secuential(const int array[] , int dim){
 	float mean=0;
@@ -138,18 +145,18 @@ int main(int argc, char *argv[]){
             grid.x = ceil(double(N)/double(bloque.x));
             grid.y = ceil(double(N)/double(bloque.y));
      }
-	time_begin=clock();
+	time_begin=dwalltime();
     func<<<grid, bloque>>>(device_array, size_array , d_gpu_res, thread_number);
     cudaThreadSynchronize();
     // download and inspect the result on the host:
    //cudaMemcpy(host_array, device_array, sizeof(int)*size_array, cudaMemcpyDeviceToHost); 
 	cudaMemcpy(h_gpu_res, d_gpu_res, sizeof(int), cudaMemcpyDeviceToHost); 
-	printf("GPU time: %f seconds\t", (((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.215s
+	printf("GPU time: %f seconds\t", dwalltime() - time_begin );
 	printf("GPU result: %f\n", h_gpu_res[0]);
 	
-	time_begin=clock();
+	time_begin=dwalltime();
 	float cpu_res=secuential(host_array, size_array);
-	printf("CPU time: %f seconds\t", (((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.215s
+	printf("CPU time: %f seconds\t", dwalltime() - time_begin  ); 
 	printf("CPU result: %f\n", cpu_res);
 
      // deallocate memory

@@ -1,0 +1,213 @@
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <math.h>
+
+
+//M and N number of threads (grid and block)
+
+void secuential(const int a[] ,const int b[], unsigned long int c[], const int sqrt_dim);
+     
+__global__ void multiply( const int A[] ,const int B[], unsigned long int C[] , const int sqrt_dim,const int thread_number)
+{
+   
+	 // Block index
+    int bx = blockIdx.x;
+    int by = blockIdx.y;
+
+    // Thread index
+    int tx = threadIdx.x;
+    int ty = threadIdx.y;
+	const int BLOCK_SIZE=32;
+    // Index of the first sub-matrix of A processed by the block
+    int aBegin = sqrt_dim * BLOCK_SIZE * by;
+
+    // Index of the last sub-matrix of A processed by the block
+    int aEnd   = aBegin + sqrt_dim - 1;
+
+    // Step size used to iterate through the sub-matrices of A
+    int aStep  = BLOCK_SIZE;
+
+    // Index of the first sub-matrix of B processed by the block
+    int bBegin = BLOCK_SIZE * bx;
+
+    // Step size used to iterate through the sub-matrices of B
+    int bStep  = BLOCK_SIZE * sqrt_dim;
+
+    // Csub is used to store the element of the block sub-matrix
+    // that is computed by the thread
+    float Csub = 0;
+
+    // Loop over all the sub-matrices of A and B
+    // required to compute the block sub-matrix
+    for (int a = aBegin, b = bBegin; a <= aEnd; a += aStep, b += bStep)
+    {
+        // Declaration of the shared memory array As used to
+        // store the sub-matrix of A
+        __shared__ float As[BLOCK_SIZE][BLOCK_SIZE];
+
+        // Declaration of the shared memory array Bs used to
+        // store the sub-matrix of B
+        __shared__ float Bs[BLOCK_SIZE][BLOCK_SIZE];
+
+        // Load the matrices from device memory
+        // to shared memory; each thread loads
+        // one element of each matrix
+        As[ty][tx] = A[a + sqrt_dim * ty + tx];
+        Bs[ty][tx] = B[b + sqrt_dim * ty + tx];
+
+        // Synchronize to make sure the matrices are loaded
+        __syncthreads();
+
+        // Multiply the two matrices together;
+        // each thread computes one element
+        // of the block sub-matrix
+#pragma unroll
+        for (int k = 0; k < BLOCK_SIZE; ++k)
+        {
+            Csub += As[ty][k] * Bs[k][tx];
+        }
+
+        // Synchronize to make sure that the preceding
+        // computation is done before loading two new
+        // sub-matrices of A and B in the next iteration
+        __syncthreads();
+    }
+
+    // Write the block sub-matrix to device memory;
+    // each thread writes one element
+    int c = sqrt_dim * BLOCK_SIZE * by + BLOCK_SIZE * bx;
+    C[c + sqrt_dim * ty + tx] = Csub;
+	
+} 
+
+    
+int main(int argc, char *argv[]){
+	//Measure time
+	clock_t time_begin;
+    // pointers to host & device arrays
+      int *d_array1 = 0,*d_array2 = 0; unsigned long int *d_array3 = 0;
+      int *h_array1 = 0,*h_array2 = 0;unsigned long int*h_array3 = 0;
+	  unsigned long int *h_array_sec= 0;
+	 unsigned int size_array=360000; //here, size_array =L has to be a square
+
+	 int N=20;
+	 if(argc == 3){
+		 size_array=atoi(argv[1]) * atoi(argv[1]) ;
+		 N=atoi(argv[2]);
+	
+	 }  
+      // malloc columns of host arrays
+	  h_array1 = (int*)malloc( size_array * sizeof(int));
+	  h_array_sec= (unsigned long int*)malloc( size_array * sizeof(unsigned long int));
+	  h_array2 = (int*)malloc( size_array * sizeof(int));
+	  h_array3 = (unsigned long int*)malloc( size_array * sizeof(unsigned long int));
+	
+	  
+	//printf("Array A:\n");
+	for(unsigned long int i=0; i<size_array; i++){
+		h_array1[i]=1;//rand()%10;
+	//	printf("%i\t",  h_array1[i]);
+		//if((i+1)%(int)sqrt((float)size_array)==0)
+		//	printf("\n");
+	}
+	//printf("\n");
+ 
+	//printf("Array B:\n");
+	for(int i=0; i<size_array; i++){
+		h_array2[i]=1;//rand()%10; 	
+		//printf("%i\t",  h_array2[i]);
+		//if((i+1)%(int)sqrt((float)size_array)==0)
+		//	printf("\n");
+	}
+	//printf("\n");
+ 
+
+     // cudaMalloc a device array
+    cudaMalloc(&d_array1,size_array * sizeof(int));    
+	cudaMalloc(&d_array2,size_array * sizeof(int));  
+	cudaMalloc(&d_array3,size_array * sizeof(unsigned long int));  
+    // download and inspect the result on the host:
+    cudaMemcpy(d_array1, h_array1, sizeof(int)*size_array, cudaMemcpyHostToDevice);   
+	cudaMemcpy(d_array2, h_array2, sizeof(int)*size_array, cudaMemcpyHostToDevice);   
+
+    dim3 bloque(N,N); //Bloque bidimensional de N*N hilos (max 512 threads in a block)
+    dim3 grid(1,1);  //Grid bidimensional de M*M bloques
+	int thread_number= N*N;
+	if (N*N > 512){
+            bloque.x = 512;
+            bloque.y = 512;
+            grid.x = ceil(double(N)/double(bloque.x));
+            grid.y = ceil(double(N)/double(bloque.y));
+       }
+	printf("%i threads, %ix%i matrix\n", thread_number,  (int)sqrt((float)size_array), (int)sqrt((float)size_array));
+	time_begin=clock();
+    
+	multiply<<<grid, bloque>>>(d_array1, d_array2 , d_array3,sqrt((float)size_array), thread_number);
+    cudaThreadSynchronize();
+    // download and inspect the result on the host:
+    cudaMemcpy(h_array3, d_array3, sizeof(unsigned long int)*size_array, cudaMemcpyDeviceToHost); 
+	
+	//printf("GPU time: %f seconds\n", clock() - time_begin);
+	//windows time
+	printf("GPU time, %i threads: %f seconds\n", thread_number,(((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.18s
+
+
+
+	printf("Array C=B + AB^t + A^t :\n");
+    for(int i=0; i<size_array; i++){
+        printf("%i\t", h_array3[i]);
+	if((i+1)%(int)(sqrt((float)size_array))==0)
+		printf("\n");
+	}
+	printf("\n");
+	time_begin=clock();
+	secuential(h_array1, h_array2,  h_array_sec, sqrt((float)size_array));
+
+	//printf("CPU time: %f seconds\n", clock() - time_begin);
+	//windows time
+	printf("CPU time: %f seconds\n", (((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.18s
+     // deallocate memory
+	bool b=true;
+	for(int i=0; i<size_array; i++){
+		if(h_array_sec[i] !=  h_array3[i]){
+			printf("GPU and CPU have different results (at least) at position %i\n", i);
+			b=false;
+			break;		
+		}
+	}
+	if(b)
+		printf("GPU and CPU have the same results\n");
+    free(h_array3); free(h_array2); free(h_array1); free(h_array_sec);
+    cudaFree(d_array3);cudaFree(d_array2);cudaFree(d_array1);
+
+	  
+
+}
+
+void secuential(const int a[] ,const int b[], unsigned long int c[], const int sqrt_dim){
+	int dim = sqrt_dim* sqrt_dim;
+	int index_i, index_j;
+	//int *c= (int *)malloc ( dim * sizeof(int));
+	for(int i=0; i< dim; i++){
+		index_i = (int)i%sqrt_dim; 
+		index_j = (i-index_i)/sqrt_dim;
+		c[i]= b[i]; //c= b
+		c[i]+= a[index_j+ index_i * sqrt_dim]; //c+= a^t
+		for(int j=0;j<sqrt_dim;j++){ //row of first matrix
+			c[i]+=a[j+index_j * sqrt_dim ]*b[j + index_i*sqrt_dim]; //c+= a*b^t
+		}
+	}
+
+	/*printf("Sequential result: Array C=B + AB^t + A^t :\n");
+    for(int i=0; i<dim; i++){
+        printf("%i\t", c[i]);
+		if((i+1)%(int)(sqrt((float)dim))==0)
+			printf("\n");
+	}
+	printf("\n");*/
+	//free(c);
+}

@@ -27,7 +27,7 @@ float secuential(const int array[] , int dim){
 }
 
      
-__global__ void func( const int array[] , int dim,float result[], const int thread_number)
+__global__ void addAll( const int array[] , int dim,float result[], const int thread_number)
 {
     int index = blockIdx.x* blockDim.x* blockDim.y* blockDim.z+threadIdx.z* blockDim.y* blockDim.x+ threadIdx.y* blockDim.x+ threadIdx.x;
  	//printf("sum:%i\n",  result[0]);
@@ -53,10 +53,11 @@ __global__ void func( const int array[] , int dim,float result[], const int thre
 		//printf("sum:%i\n",  result[0]);
 	}
 	
-	 __syncthreads();
-
-	float mean=result[0]/dim;
-	result[0]=0;
+} 
+__global__ void sigma( const int array[] , int dim,float result[], const float mean, const int thread_number)
+{
+	 int index = blockIdx.x* blockDim.x* blockDim.y* blockDim.z+threadIdx.z* blockDim.y* blockDim.x+ threadIdx.y* blockDim.x+ threadIdx.x;
+ 	//printf("sum:%i\n",  result[0]);
 	if(index<dim){
 		if(dim<=thread_number){ //if more threads than array size
 			//printf("Thread %i; Adding value of index %i\n", index, index, array[index]);
@@ -76,85 +77,85 @@ __global__ void func( const int array[] , int dim,float result[], const int thre
 				}
 			}
 		}
+		//printf("sum:%i\n",  result[0]);
 	}
-	 __syncthreads();
-	result[0]=sqrt(result[0]/(dim-1));
-} 
 
+
+}
 
     
 int main(int argc, char *argv[]){
 	//Measure time
 	clock_t time_begin;
-	
+	time_begin=clock();
     // pointers to host & device arrays
      int *device_array = 0;
      int *host_array = 0;
 	 int size_array=9;
-	 float *d_gpu_res=NULL;
-	 float *h_gpu_res= 0;
-	 bool verbose=false;
-	 int N=1;
-	 if(argc == 3){
+	 float *d_sum=NULL;
+	 float *h_sum= 0;
+	 float mean;
+	 float final_res;
+	 int M=1, N=1;
+	 if(argc == 4){
 		 size_array=atoi(argv[1]);
 		 N=atoi(argv[2]);
+		 M=atoi(argv[3]);
 	 }
-	 else if(argc== 4 ){
-		 size_array=atoi(argv[1]);
-		 N=atoi(argv[2]);
-		 verbose=(argv[3][0]=='v');
-	 }
-	 
-	 h_gpu_res=( float*)malloc(sizeof( float));
-	 h_gpu_res[0]=0;
+	 h_sum=( float*)malloc(sizeof( float));
+	 h_sum[0]=0;
       // malloc a host array
      host_array = (int*)malloc( size_array * sizeof(int));
 	
     for(int i=0; i<size_array; i++){
-		host_array[i]=rand()%10;
-		if(argc==4 && verbose){
-			printf("%i\t", host_array[i]);
-		}
-		else if(argc==4)
-			host_array[i]=atoi(argv[3]);
+        host_array[i]=rand()%10;
+       // printf("%i\t", host_array[i]);
     }
     printf("\n");
 	
 	
      // cudaMalloc a device array
      cudaMalloc(&device_array,size_array * sizeof(int));    
-	 cudaError_t er=cudaMalloc(&d_gpu_res, sizeof(float));  
+	 cudaError_t er=cudaMalloc(&d_sum, sizeof(float));  
     // download and inspect the result on the host:
     cudaError_t e=cudaMemcpy(device_array, host_array, sizeof(int)*size_array, cudaMemcpyHostToDevice); 
-	cudaError_t error=cudaMemcpy(d_gpu_res, h_gpu_res, sizeof(int), cudaMemcpyHostToDevice);
+	cudaError_t error=cudaMemcpy(d_sum, h_sum, sizeof(int), cudaMemcpyHostToDevice);
 	//cudaerrorinvalidvalue(11)
 
     dim3 bloque(N,N); //Bloque bidimensional de N*N hilos
-    dim3 grid(1,1);  //Grid bidimensional de M*M bloques
-	int thread_number= N*N;
-	if (N*N > 512){
-            bloque.x = 512;
-            bloque.y = 512;
-            grid.x = ceil(double(N)/double(bloque.x));
-            grid.y = ceil(double(N)/double(bloque.y));
-     }
-	time_begin=clock();
-    func<<<grid, bloque>>>(device_array, size_array , d_gpu_res, thread_number);
+    dim3 grid(M,M);  //Grid bidimensional de M*M bloques
+	int thread_number= N*N*M*M;
+    addAll<<<grid, bloque>>>(device_array, size_array , d_sum, thread_number);
     cudaThreadSynchronize();
     // download and inspect the result on the host:
    //cudaMemcpy(host_array, device_array, sizeof(int)*size_array, cudaMemcpyDeviceToHost); 
-	cudaMemcpy(h_gpu_res, d_gpu_res, sizeof(int), cudaMemcpyDeviceToHost); 
-	printf("GPU time: %f seconds\t", (((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.215s
-	printf("GPU result: %f\n", h_gpu_res[0]);
+	cudaMemcpy(h_sum, d_sum, sizeof(int), cudaMemcpyDeviceToHost); 
+   
+    printf("Sum of array: %f\n", h_sum[0]);
+	mean=h_sum[0]/size_array;
+	h_sum[0]=0;
+
+	cudaMemcpy(d_sum, h_sum, sizeof(int), cudaMemcpyHostToDevice);
+	sigma<<<grid, bloque>>>(device_array, size_array , d_sum, mean, thread_number);
+	cudaThreadSynchronize();
+	cudaMemcpy(h_sum, d_sum, sizeof(int), cudaMemcpyDeviceToHost); 
+
+	 printf("Sigma: %f\n", h_sum[0]);
 	
+	final_res = sqrt(h_sum[0]/(size_array-1));
+	printf("GPU time: %f seconds\n", (((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.215s
+	printf("GPU result: %f\n", final_res);
 	time_begin=clock();
 	float cpu_res=secuential(host_array, size_array);
-	printf("CPU time: %f seconds\t", (((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.215s
+	printf("CPU time: %f seconds\n", (((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.215s
 	printf("CPU result: %f\n", cpu_res);
-
+	if(final_res==cpu_res)
+		printf("CPU and GPU have same result\n");
+	else
+		printf("CPU and GPU have different result\n");
      // deallocate memory
-      free(host_array);free(h_gpu_res);
-      cudaFree(device_array); cudaFree(d_gpu_res);
+      free(host_array);free(h_sum);
+      cudaFree(device_array); cudaFree(d_sum);
 
 	
 

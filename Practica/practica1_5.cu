@@ -7,8 +7,7 @@
 #include <time.h>
 #include <math.h>
 //M and N number of threads (grid and block)
-#define M 1 
-#define N 2
+
 
 
      
@@ -67,6 +66,12 @@ int main(int argc, char *argv[]){
       int *d_array1 = 0,*d_array2 = 0,*d_array3 = 0;
       int *h_array1 = 0,*h_array2 = 0,*h_array3 = 0;
 	  int size_array=9; //here, size_array =L hqs to be a square
+
+	 int N=3;
+	 if(argc == 3){
+		 size_array=atoi(argv[1]) * atoi(argv[1]) ;
+		 N=atoi(argv[2]);
+	 }  
       // malloc columns of host arrays
       h_array1 = (int*)malloc( size_array * sizeof(int));
 	h_array2 = (int*)malloc( size_array * sizeof(int));
@@ -75,13 +80,13 @@ int main(int argc, char *argv[]){
 		  
  
 	for(int i=0; i<size_array; i++){
-		h_array1[i]=rand()%10;
-		h_array2[i]=rand()%10;
-		printf("%i|%i\t",  h_array1[i], h_array2[i]);
-		if((i+1)%(int)sqrt((float)size_array)==0)
-			printf("\n");
+		h_array1[i]=1;//rand()%10;
+		h_array2[i]=1;//rand()%10;
+	//	printf("%i|%i\t",  h_array1[i], h_array2[i]);
+		//if((i+1)%(int)sqrt((float)size_array)==0)
+			//printf("\n");
 	}
-	printf("\n");
+	//printf("\n");
  
 
      // cudaMalloc a device array
@@ -93,8 +98,8 @@ int main(int argc, char *argv[]){
 	cudaMemcpy(d_array2, h_array2, sizeof(int)*size_array, cudaMemcpyHostToDevice);   
 
     dim3 bloque(N,N); //Bloque bidimensional de N*N hilos
-    dim3 grid(M,M);  //Grid bidimensional de M*M bloques
-	int thread_number= N*N*M*M;
+    dim3 grid(1,1);  //Grid bidimensional de M*M bloques
+	int thread_number= N*N;
     multiply<<<grid, bloque>>>(d_array1, d_array2 , d_array3,sqrt((float)size_array), thread_number);
     cudaThreadSynchronize();
     // download and inspect the result on the host:

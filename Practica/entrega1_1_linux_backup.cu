@@ -6,6 +6,16 @@
 #include <time.h>
 #include <math.h>
 
+#include <sys/time.h>
+#include <sys/resource.h>
+double dwalltime(){
+        double sec;
+        struct timeval tv;
+
+        gettimeofday(&tv,NULL);
+        sec = tv.tv_sec + tv.tv_usec/1000000.0;
+        return sec;
+}
 
 //M and N number of threads (grid and block)
 
@@ -13,16 +23,10 @@ void secuential(const int a[] ,const int b[], int c[], const int sqrt_dim);
      
 __global__ void multiply( const int a[] ,const int b[], int c[] , const int sqrt_dim,const int thread_number)
 {
-   
-	long int blockId = blockIdx.x + blockIdx.y * gridDim.x
- + gridDim.x * gridDim.y * blockIdx.z;
-	unsigned long int index = blockId * (blockDim.x * blockDim.y * blockDim.z)
- + (threadIdx.z * (blockDim.x * blockDim.y))
- + (threadIdx.y * blockDim.x) + threadIdx.x;
-
+    int index = blockIdx.x* blockDim.x* blockDim.y* blockDim.z+threadIdx.z* blockDim.y* blockDim.x+ threadIdx.y* blockDim.x+ threadIdx.x;
  	//for an element in matrix[i][j] , its coordinate k in array[] is i+j*sqrt(size_array)
-	unsigned long int index_i = index < sqrt_dim ? index : (int)index%sqrt_dim; 
-   	unsigned long int index_j = (index-index_i)/sqrt_dim;
+	int index_i = index < sqrt_dim ? index : (int)index%sqrt_dim; 
+   	int index_j = (index-index_i)/sqrt_dim;
 	int dim=sqrt_dim*sqrt_dim;
 
 	//printf("index= %i \t", index); 
@@ -30,7 +34,7 @@ __global__ void multiply( const int a[] ,const int b[], int c[] , const int sqrt
 	if(index<dim){
 		c[index]=0;
 		if(dim<=thread_number){ //if more threads than array size
-			printf("Thread %i; Modifying value of index %i\n ", index, index);
+			//printf("Thread %i; Modifying value of index %i\n ", index, index);
 			c[index]= b[index]; //c= b
 			c[index]+= a[index_j+ index_i * sqrt_dim]; //c+= a^t
 			for(int i=0; i<sqrt_dim;i++){ //row of first matrix	
@@ -42,12 +46,11 @@ __global__ void multiply( const int a[] ,const int b[], int c[] , const int sqrt
 				
 				if(index!=thread_number-1){//if not last thread deal with size_array/thread_nb array entries
 					for(int i=index*(int)(dim/thread_number); i< index*(int)(dim/thread_number)+(int)(dim/thread_number); i++){
-						printf("Thread %i; Modifying value of index %i \n", index, i);
+					//	printf("Thread %i; Modifying value of index %i \n", index, i);
 						index_i =  (int)i%sqrt_dim; 
 						index_j = (i-index_i)/sqrt_dim;
 						c[i]= b[i]; //c= b
 						c[i]+= a[index_j+ index_i * sqrt_dim]; //c+= a^t
-						
 						for(int j=0; j<sqrt_dim;j++){ //row of first matrix
 							c[i]+=a[j+index_j * sqrt_dim ]*b[j+ index_i*sqrt_dim]; //c+= a*b^t
 						} 
@@ -55,7 +58,7 @@ __global__ void multiply( const int a[] ,const int b[], int c[] , const int sqrt
 				}
 				else{ //if last thread deal with all remaining array entries
 					for(int i=index*(int)(dim/thread_number); i< dim; i++){
-						printf("Thread %i; Modifying value of index %i\n",index, i );
+			//			printf("Thread %i; Modifying value of index %i\n",index, i );
 						index_i = (int)i%sqrt_dim; 
 						index_j = (i-index_i)/sqrt_dim;
 						c[i]= b[i]; //c= b
@@ -80,7 +83,7 @@ int main(int argc, char *argv[]){
 	  int *h_array_sec= 0;
 	  int size_array=9; //here, size_array =L has to be a square
 
-	 int M=2, N=2;
+	 int M=1, N=1;
 	 if(argc == 4){
 		 size_array=atoi(argv[1]) * atoi(argv[1]) ;
 		 N=atoi(argv[2]);
@@ -124,31 +127,31 @@ int main(int argc, char *argv[]){
     dim3 grid(M,M);  //Grid bidimensional de M*M bloques
 	int thread_number= N*N*M*M;
 	printf("%i threads, %ix%i matrix\n", thread_number,  (int)sqrt((float)size_array), (int)sqrt((float)size_array));
-	time_begin=clock();
+	time_begin=dwalltime();
     multiply<<<grid, bloque>>>(d_array1, d_array2 , d_array3,sqrt((float)size_array), thread_number);
     cudaThreadSynchronize();
     // download and inspect the result on the host:
     cudaMemcpy(h_array3, d_array3, sizeof(int)*size_array, cudaMemcpyDeviceToHost); 
 	
-	//printf("GPU time: %f seconds\n", clock() - time_begin);
+	printf("GPU time: %f seconds\n", dwalltime() - time_begin);
 	//windows time
-	printf("GPU time, %i threads: %f seconds\n", thread_number,(((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.18s
+	//printf("GPU time, %i threads: %f seconds\n", thread_number,(((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.18s
 
 
-/*
+
 	printf("Array C=B + AB^t + A^t :\n");
     for(int i=0; i<size_array; i++){
         printf("%i\t", h_array3[i]);
 	if((i+1)%(int)(sqrt((float)size_array))==0)
 		printf("\n");
 	}
-	printf("\n");*/
-	time_begin=clock();
+	printf("\n");
+	time_begin=dwalltime();
 	secuential(h_array1, h_array2,  h_array_sec, sqrt((float)size_array));
 
-	//printf("CPU time: %f seconds\n", clock() - time_begin);
+	printf("CPU time: %f seconds\n", dwalltime() - time_begin);
 	//windows time
-	printf("CPU time: %f seconds\n", (((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.18s
+	//printf("CPU time: %f seconds\n", (((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.18s
      // deallocate memory
 	for(int i=0; i<size_array; i++){
 		if(h_array_sec[i] !=  h_array3[i]){
