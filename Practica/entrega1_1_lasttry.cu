@@ -6,23 +6,27 @@
 #include <time.h>
 #include <math.h>
 
-#define TILE_WIDTH 16
+
 
 //M and N number of threads (grid and block)
 
 void secuential(const int a[] ,const int b[], unsigned long int c[], const int sqrt_dim);
      
-__global__ void multiply( const int A[] ,const int B[], unsigned long int C[] , const int width,const int thread_number)
+__global__ void multiply( const int a[] ,const int b[], unsigned long int c[] , const int width,const int tile_width)
 {
- int sum = 0;
- int col = blockIdx.x*TILE_WIDTH + threadIdx.x;
- int row = blockIdx.y*TILE_WIDTH + threadIdx.y;
- if(col < width && row < width) {
- for (int k = 0; k < width; k++)
- sum += A[row * width + k] * B[k * width + col];
- C[row * width + col] = sum;
- }
 
+ int sum = 0;
+ int col = blockIdx.x*tile_width + threadIdx.x;
+ int fila = blockIdx.y*tile_width + threadIdx.y;
+ if(col < width && fila < width) {
+	for (int k = 0; k < width; k++)
+		sum += a[fila * width + k] * b[col * width + k]; // a*b^t 
+
+	c[fila * width + col] = sum; 
+	c[fila * width + col]+= b[fila * width + col]; //c+=b
+	c[fila * width + col]+= a[col*width+fila]; // c+=a^t??
+
+ }
 	
 } 
 
@@ -34,14 +38,19 @@ int main(int argc, char *argv[]){
       int *d_array1 = 0,*d_array2 = 0; unsigned long int *d_array3 = 0;
       int *h_array1 = 0,*h_array2 = 0;unsigned long int*h_array3 = 0;
 	  unsigned long int *h_array_sec= 0;
-	 unsigned int size_array=512*512; //here, size_array =L has to be a square
-
-	 int N=512;
+	 unsigned int size_array=2048*2048; //here, size_array =L has to be a square
+	 bool verbose=false;
+	 int tile_width =22;
 	 if(argc == 3){
 		 size_array=atoi(argv[1]) * atoi(argv[1]) ;
-		 N=atoi(argv[2]);
+		 tile_width=atoi(argv[2]);
 	
-	 }  
+	 }
+	 else if(argc==4){
+		 size_array=atoi(argv[1]) * atoi(argv[1]) ;
+		 tile_width=atoi(argv[2]);
+		 verbose=(argv[3][0]=='v');
+	 }
       // malloc columns of host arrays
 	  h_array1 = (int*)malloc( size_array * sizeof(int));
 	  h_array_sec= (unsigned long int*)malloc( size_array * sizeof(unsigned long int));
@@ -76,38 +85,31 @@ int main(int argc, char *argv[]){
     cudaMemcpy(d_array1, h_array1, sizeof(int)*size_array, cudaMemcpyHostToDevice);   
 	cudaMemcpy(d_array2, h_array2, sizeof(int)*size_array, cudaMemcpyHostToDevice);   
 
-    //dim3 bloque(N,N); //Bloque bidimensional de N*N hilos (max 512 threads in a block)
-    //dim3 grid(1,1);  //Grid bidimensional de M*M bloques
-	 dim3 bloque(TILE_WIDTH, TILE_WIDTH);
-	dim3 grid((int)ceil(double(N)/double(bloque.x)), ceil(double(N)/double(bloque.y)));
-	int thread_number= N*N;
-	/*if (N*N > 512){
-            bloque.x = 512;
-            bloque.y = 512;
-            grid.x = ceil(double(N)/double(bloque.x));
-            grid.y = ceil(double(N)/double(bloque.y));
-       }*/
-	printf("%i threads, %ix%i matrix\n", thread_number,  (int)sqrt((float)size_array), (int)sqrt((float)size_array));
+	dim3 bloque(tile_width, tile_width);
+	dim3 grid((int)ceil(double(sqrt((float)size_array))/double(bloque.x)), ceil(double(sqrt((float)size_array))/double(bloque.y)));
+	//int thread_number= N*N;
+	printf("%i threads per block, %ix%i matrix\n", tile_width*tile_width,  (int)sqrt((float)size_array), (int)sqrt((float)size_array));
 	time_begin=clock();
     
-	multiply<<<grid, bloque>>>(d_array1, d_array2 , d_array3,sqrt((float)size_array), thread_number);
+	multiply<<<grid, bloque>>>(d_array1, d_array2 , d_array3,sqrt((float)size_array), tile_width);
     cudaThreadSynchronize();
     // download and inspect the result on the host:
     cudaMemcpy(h_array3, d_array3, sizeof(unsigned long int)*size_array, cudaMemcpyDeviceToHost); 
 	
 	//printf("GPU time: %f seconds\n", clock() - time_begin);
 	//windows time
-	printf("GPU time, %i threads: %f seconds\n", thread_number,(((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.18s
+	printf("GPU time, %i threads per block: %f seconds\n", tile_width*tile_width,(((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.18s
 
 
-
-	printf("Array C=B + AB^t + A^t :\n");
-    for(int i=0; i<size_array; i++){
-        printf("%i\t", h_array3[i]);
-	if((i+1)%(int)(sqrt((float)size_array))==0)
+	if(verbose){
+		printf("Array C=B + AB^t + A^t :\n");
+		for(int i=0; i<size_array; i++){
+			printf("%i\t", h_array3[i]);
+		if((i+1)%(int)(sqrt((float)size_array))==0)
+			printf("\n");
+		}
 		printf("\n");
 	}
-	printf("\n");
 	time_begin=clock();
 	secuential(h_array1, h_array2,  h_array_sec, sqrt((float)size_array));
 
