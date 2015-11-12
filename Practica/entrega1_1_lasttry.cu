@@ -40,7 +40,7 @@ int main(int argc, char *argv[]){
 	  unsigned long int *h_array_sec= 0;
 	 unsigned int size_array=2048*2048; //here, size_array =L has to be a square
 	 bool verbose=false;
-	 int tile_width =22;
+	 int tile_width =16;
 	 if(argc == 3){
 		 size_array=atoi(argv[1]) * atoi(argv[1]) ;
 		 tile_width=atoi(argv[2]);
