@@ -7,9 +7,6 @@
 #include <math.h>
 
 
-
-//M and N number of threads (grid and block)
-
 void secuential(const int a[] ,const int b[], unsigned long int c[], const int sqrt_dim);
      
 __global__ void multiply( const int a[] ,const int b[], unsigned long int c[] , const int width,const int tile_width)
@@ -98,8 +95,7 @@ int main(int argc, char *argv[]){
 	
 	//printf("GPU time: %f seconds\n", clock() - time_begin);
 	//windows time
-	printf("GPU time, %i threads per block: %f seconds\n", tile_width*tile_width,(((float)clock() - (float)time_begin) / 1000000.0F ) * 1000  ); //1.18s
-
+	²
 
 	if(verbose){
 		printf("Array C=B + AB^t + A^t :\n");

@@ -1,7 +1,4 @@
-/*Realizar un programa CUDA que dado un vector V de N números enteros multiplique a 
-cada número por una constante C, se deben realizar dos implementaciones:
-a.Tanto C como N deben ser pasados como parámetros al kernel.
-b.Tanto C como N deben estar almacenados en la memoria de constantes de la GPU*/
+
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
@@ -9,7 +6,7 @@ b.Tanto C como N deben estar almacenados en la memoria de constantes de la GPU*/
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
-//M and N number of threads (grid and block)
+
 
 
 float secuential(const int array[] , int dim){
