@@ -52,7 +52,7 @@ __global__ void pre_sigma( double a[], const int dim, const double mean)
 {
 	/*extern __shared__ double shared[];
 	unsigned long int global_id = blockIdx.x * blockDim.x + threadIdx.x;	
-	shared[threadIdx.x]= (global_id < dim) ? a[global_id]: 0;
+	shared[threadIdx.x=] (global_id < dim) ? a[global_id]: 0;
 	__syncthreads();
 
 	//if ( global_id< dim) {
@@ -72,39 +72,35 @@ __global__ void pre_sigma( double a[], const int dim, const double mean)
 
 int main(int argc, char *argv[])
 {
- clock_t time_begin;
- unsigned long int size_array  = (argc > 1)? atoi (argv[1]): 4;
- unsigned int block_size = (argc > 2)? atoi (argv[2]): 2;	
- bool verbose= (argc>3)? (argv[3][0]=='v'): false;
-  // generate random input on the host
-  double *host_array=(double*)malloc( size_array * sizeof(double));
-  for(unsigned int i = 0; i < size_array; ++i)
-  {
-    host_array[i] =rand()%10;
+	 clock_t time_begin;
+	 unsigned long int size_array  = (argc > 1)? atoi (argv[1]): 4;
+	 unsigned int block_size = (argc > 2)? atoi (argv[2]): 2;	
+	 bool verbose= (argc>3)? (argv[3][0]=='v'): false;
+	 double *host_array=(double*)malloc( size_array * sizeof(double));
+	for(unsigned int i = 0; i < size_array; ++i)
+	{
+	host_array[i] =rand()%10;
 	if(verbose) printf("%f\t", host_array[i]);
-  }
-  if(verbose) printf("\n");
+	}
+	if(verbose) printf("\n");
 
- // for(unsigned int i=0; i< size_array; i++)
-	//	host_result+= host_array[i];
   time_begin=clock();
   double cpu_result=secuential(host_array, size_array,verbose);
+  printf("CPU time: %f seconds\t", (((double)clock() - (double)time_begin) / 1000000.0F ) * 1000  );
   printf("cpu result: %f\n", cpu_result);
-  // move input to device memory
   double *device_array = 0;
+ 
+  time_begin=clock();
   cudaMalloc((void**)&device_array, sizeof(double) * size_array);
   cudaMemcpy(device_array, &host_array[0], sizeof(double) * size_array, cudaMemcpyHostToDevice);
 
   const size_t bloques = (size_array/block_size) + ((size_array%block_size) ? 1 : 0);
-
   double *device_array_out = 0;
   cudaMalloc((void**)&device_array_out, sizeof(double) * (bloques + 1));
 
   reduccion<<<bloques,block_size,block_size * sizeof(double)>>>(device_array, device_array_out, size_array);
-
   reduccion<<<1,bloques,bloques * sizeof(double)>>>(device_array_out, device_array_out + bloques, bloques);
 
-  // copy the result back to the host
   double device_result = 0;
   cudaMemcpy(&device_result, device_array_out + bloques, sizeof(double), cudaMemcpyDeviceToHost);
 
@@ -123,8 +119,6 @@ int main(int argc, char *argv[])
 			printf("%f\t", host_array[j]);
 		printf("\n");
    }
-
-
    //------------
    reduccion<<<bloques,block_size,block_size * sizeof(double)>>>(device_array, device_array_out, size_array);
 
@@ -133,7 +127,9 @@ int main(int argc, char *argv[])
    cudaMemcpy(&device_result, device_array_out + bloques, sizeof(double), cudaMemcpyDeviceToHost);
     printf("gpu sigma: %f\n", device_result);
 	double final_res= sqrt(device_result/(size_array-1));
-	 printf("gpu result: %f\n", final_res);
+	printf("GPU time: %f seconds\t", (((double)clock() - (double)time_begin) / 1000000.0F ) * 1000  );
+
+	printf("gpu result: %f\n", final_res);
   // deallocate device memory
   cudaFree(device_array);
   cudaFree(device_array_out);

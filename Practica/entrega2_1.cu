@@ -10,93 +10,41 @@ void secuential(const int a[] ,const int b[], int c[], const unsigned int sqrt_d
      
 __global__ void multiply(  const int* A, const int* B,int* C, int width, int tile_width)
 {
-    // Block index
-    int bx = blockIdx.x;
-    int by = blockIdx.y;
 
-    // Thread index
-    int tx = threadIdx.x;
-    int ty = threadIdx.y;
-
-	
-    // Index of the first sub-matrix of A processed by the block
-    int aBegin = width * tile_width * by;
-
-    // Index of the last sub-matrix of A processed by the block
-    int aEnd   = aBegin + width - 1;
-		
-    // Step size used to iterate through the sub-matrices of A
-    int aStep  = tile_width;
-
-    // Index of the first sub-matrix of B processed by the block
-    int bBegin = tile_width * bx;
-
-    // Step size used to iterate through the sub-matrices of B
-    int bStep  = tile_width * width;
-
-    // Csub is used to store the element of the block sub-matrix
-    // that is computed by the thread
     float Csub = 0;
 	
-
-    // Loop over all the sub-matrices of A and B
-    // required to compute the block sub-matrix
-    for (int a = aBegin, b = bBegin;
-         a <= aEnd;
-         a += aStep, b += bStep)
+    for (int a = width * tile_width * blockIdx.y, b = tile_width * blockIdx.x; a <= width * tile_width * blockIdx.y + width - 1; a += tile_width, b +=  tile_width * width)
     {
-
 		extern __shared__ int shared[];
 
 		int *As=&shared[0];
 		int *Bs=&shared[tile_width*tile_width];
-
-        As[ty+tile_width*tx] = A[a + width * ty + tx];
-        Bs[ty+tile_width*tx] = B[b + width * ty + tx];
+        As[threadIdx.y+tile_width*threadIdx.x] = A[a + width * threadIdx.y + threadIdx.x];
+        Bs[threadIdx.y+tile_width*threadIdx.x] = B[b + width * threadIdx.y + threadIdx.x];
         __syncthreads();
-
-		//Csub=B[b + width * ty + tx] + A[a +  ty + width*tx];
-        // Multiply the two matrices together;
-        // each thread computes one element
-        // of the block sub-matrix
-#pragma unroll
 
         for (int k = 0; k < tile_width; ++k)
         {
-            //Csub += As[ty+tile_width*k] * Bs[k+tile_width*tx];//a*b
-			Csub += As[ty+tile_width*k] * Bs[tx+tile_width*k]; //a*b^t
+			Csub += As[threadIdx.y+tile_width*k] * Bs[threadIdx.x+tile_width*k]; //a*b^t
         }
 		
-        // Synchronize to make sure that the preceding
-        // computation is done before loading two new
-        // sub-matrices of A and B in the next iteration
         __syncthreads();
     }
-
-    // Write the block sub-matrix to device memory;
-    // each thread writes one element
-    int c = width * tile_width * by + tile_width * bx;
-    C[c + width * ty + tx] = Csub;
-	C[c + width * ty + tx]+=B[c + width * ty + tx] + A[c + width * tx + ty];
+    int c = width * tile_width * blockIdx.y + tile_width * blockIdx.x;
+    C[c + width * threadIdx.y + threadIdx.x] = Csub;
+	C[c + width * threadIdx.y + threadIdx.x]+=B[c + width * threadIdx.y + threadIdx.x] + A[c + width * threadIdx.x + threadIdx.y];
 
 }
 
-void constantInit(int *data, int size, int val)
+void init(int *a, int size, int val)
 {
     for (int i = 0; i < size; ++i)
     {
-        data[i] = val;
+        a[i] = val;
     }
 
 }
 
-void randomInit(int* data, int size)
-{
-   for (int i = 0; i < size; ++i)
-   data[i] = rand()%10;//rand() / (float)RAND_MAX;
-}
-
- 
 int main(int argc, char** argv)
 {
 	clock_t time_begin;
@@ -110,8 +58,8 @@ int main(int argc, char** argv)
    int* h_array_sec = (int*) malloc(sizeof(int) * size_array*size_array);
  
 
-   constantInit(h_array1, size_array*size_array,1);
-   constantInit(h_array2, size_array*size_array,1);
+   init(h_array1, size_array*size_array,1);
+   init(h_array2, size_array*size_array,1);
     
 	if(verbose){
 		printf("A:\n");

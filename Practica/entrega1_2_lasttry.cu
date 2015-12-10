@@ -50,20 +50,15 @@ __global__ void pre_sigma( double a[], const int dim, const double mean)
 
     
 int main(int argc, char *argv[]){
-	//Measure time
 	clock_t time_begin;
-	
-    // pointers to host & device arrays
      double *device_array = 0;
      double *host_array = 0;
 
 	unsigned long int size_array  = (argc > 1)? atoi (argv[1]): 1024;
 	unsigned int block_size = (argc > 2)? atoi (argv[2]): 16;	
 	bool verbose= (argc>3)? (argv[3][0]=='v'): false;
-
-      // malloc a host array
-     host_array = (double*)malloc( size_array * sizeof(double));
-	 double *copy_host_array=(double*)malloc( size_array * sizeof(double));
+    host_array = (double*)malloc( size_array * sizeof(double));
+	double *copy_host_array=(double*)malloc( size_array * sizeof(double));
 	
     for(unsigned int i=0; i<size_array; i++){
 		host_array[i]=rand()%10;
@@ -73,11 +68,7 @@ int main(int argc, char *argv[]){
 
     }
     printf("\n");	
-	
-     // cudaMalloc a device array
      cudaMalloc(&device_array,size_array * sizeof(double));    
-
-    // download and inspect the result on the host:
     cudaError_t e=cudaMemcpy(device_array, host_array, sizeof(double)*size_array, cudaMemcpyHostToDevice); 
 
 	//cudaerrorinvalidvalue(11)
@@ -93,11 +84,8 @@ int main(int argc, char *argv[]){
 		i = i/2;
 	}
 
-    // download and inspect the result on the host:
 	cudaMemcpy(copy_host_array, device_array, sizeof(double)*size_array, cudaMemcpyDeviceToHost); 
-	
 	double mean_gpu= copy_host_array[0] / size_array;
-	//copy again the original array to the device array which had been modified
 	e=cudaMemcpy(device_array, host_array, sizeof(double)*size_array, cudaMemcpyHostToDevice); 
 
 	dim3 bloque2(block_size);	
@@ -138,7 +126,6 @@ int main(int argc, char *argv[]){
 	printf("CPU time: %f seconds\t", (((double)clock() - (double)time_begin) / 1000000.0F ) * 1000  );
 	printf("CPU result: %f\n", cpu_res);
 
-    // deallocate memory
     free(host_array);free(copy_host_array);
     cudaFree(device_array); 
 
